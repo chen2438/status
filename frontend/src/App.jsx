@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal, GitCommit } from 'lucide-react';
+import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal, GitCommit, Clock } from 'lucide-react';
 import BatteryChart from './BatteryChart';
 import LocationMap from './LocationMap';
 import ChangelogModal from './ChangelogModal';
@@ -273,6 +273,24 @@ function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Top Usage Apps Card */}
+                {deviceStates.android.topUsageApps && deviceStates.android.topUsageApps.length > 0 && (
+                  <div className="top-apps-card">
+                    <div className="top-apps-header">
+                      <Clock size={14} className="text-muted" />
+                      <span>Top Apps (24h)</span>
+                    </div>
+                    <div className="top-apps-list">
+                      {deviceStates.android.topUsageApps.map((app, index) => (
+                        <div key={index} className="top-app-item">
+                          <span className="top-app-name">{app.name}</span>
+                          <span className="top-app-duration">{formatDuration(app.duration)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <LocationMap location={deviceStates.android.location} />
 

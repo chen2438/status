@@ -224,6 +224,9 @@ class StatusService : Service() {
             }
             val networkInfo = getNetworkInfo()
             put("network", networkInfo)
+
+            val topUsageApps = getTopUsageApps()
+            put("topUsageApps", topUsageApps)
         }
 
         val payload = JSONObject().apply {
@@ -372,6 +375,37 @@ class StatusService : Service() {
 
         // Fall back to cached value if no recent ACTIVITY_RESUMED events found
         return currentPackage.ifEmpty { lastForegroundPackage }
+    }
+
+    private fun getTopUsageApps(): JSONArray {
+        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val time = System.currentTimeMillis()
+        val stats = usageStatsManager.queryUsageStats(
+            UsageStatsManager.INTERVAL_DAILY,
+            time - 1000 * 60 * 60 * 24L,
+            time
+        )
+        
+        val appUsageMap = mutableMapOf<String, Long>()
+        stats?.forEach { stat ->
+            if (stat.totalTimeInForeground > 60_000) { // More than 1 minute
+                val appName = getAppName(stat.packageName)
+                if (appName != "Unknown") {
+                    appUsageMap[appName] = (appUsageMap[appName] ?: 0L) + stat.totalTimeInForeground
+                }
+            }
+        }
+        
+        val topApps = appUsageMap.entries.sortedByDescending { it.value }.take(5)
+        
+        val jsonArray = JSONArray()
+        topApps.forEach { (name, timeInMillis) ->
+            jsonArray.put(JSONObject().apply {
+                put("name", name)
+                put("duration", timeInMillis / 1000) // in seconds
+            })
+        }
+        return jsonArray
     }
 
     private fun getAppName(packageName: String): String {
