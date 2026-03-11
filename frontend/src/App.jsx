@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal } from 'lucide-react';
+import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal, GitCommit } from 'lucide-react';
 import BatteryChart from './BatteryChart';
 import LocationMap from './LocationMap';
+import ChangelogModal from './ChangelogModal';
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
   const [androidBatteryHistory, setAndroidBatteryHistory] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
   useEffect(() => {
     let ws;
@@ -94,9 +96,15 @@ function App() {
           </div>
           <h1>Ecosystem Dashboard</h1>
         </div>
-        <div className={`status-badge ${connectionStatus}`}>
-          {connectionStatus === 'connected' ? <Wifi size={16} /> : <WifiOff size={16} />}
-          <span>{connectionStatus === 'connected' ? 'Server Online' : 'Server Offline'}</span>
+        <div className="header-right">
+          <button className="changelog-btn" onClick={() => setChangelogOpen(true)}>
+            <GitCommit size={16} />
+            <span>Changelog</span>
+          </button>
+          <div className={`status-badge ${connectionStatus}`}>
+            {connectionStatus === 'connected' ? <Wifi size={16} /> : <WifiOff size={16} />}
+            <span>{connectionStatus === 'connected' ? 'Server Online' : 'Server Offline'}</span>
+          </div>
         </div>
       </header>
 
@@ -276,6 +284,7 @@ function App() {
           </div>
         </div>
       </main>
+      <ChangelogModal isOpen={changelogOpen} onClose={() => setChangelogOpen(false)} />
     </div>
   );
 }
