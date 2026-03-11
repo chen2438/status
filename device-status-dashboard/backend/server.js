@@ -2,6 +2,8 @@ const WebSocket = require('ws');
 const http = require('http');
 
 const PORT = process.env.PORT || 8080;
+const MAX_BATTERY_HISTORY = 1440; // 24 hours at 1-minute sampling
+const SAMPLE_INTERVAL_MS = 60 * 1000; // 1 minute
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -11,15 +13,45 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 
 // Store the latest state of devices
-// structure:
-// {
-//   'macos': { battery: 100, memoryUsedPercent: 45, cpuPercent: 12, foregroundApp: 'Safari', timestamp: 123456 },
-//   'android': { battery: 80, foregroundApp: 'YouTube', timestamp: 123456 }
-// }
 const deviceStates = {};
 
+// Store battery history per device: { 'android': [ { battery, isCharging, time }, ... ] }
+const batteryHistory = {};
+// Track last stored time per device for 1-minute dedup
+const lastBatteryStoredTime = {};
+
+function recordBatteryHistory(deviceId, state) {
+  const now = Date.now();
+  // Only store if at least 1 minute has passed since last entry
+  if (lastBatteryStoredTime[deviceId] && now - lastBatteryStoredTime[deviceId] < SAMPLE_INTERVAL_MS) {
+    return;
+  }
+  lastBatteryStoredTime[deviceId] = now;
+
+  if (!batteryHistory[deviceId]) {
+    batteryHistory[deviceId] = [];
+  }
+
+  batteryHistory[deviceId].push({
+    battery: state.battery,
+    isCharging: state.isCharging || false,
+    time: now,
+  });
+
+  // Trim to max size
+  if (batteryHistory[deviceId].length > MAX_BATTERY_HISTORY) {
+    batteryHistory[deviceId] = batteryHistory[deviceId].slice(
+      batteryHistory[deviceId].length - MAX_BATTERY_HISTORY
+    );
+  }
+}
+
 function broadcastState() {
-  const stateStr = JSON.stringify({ type: 'state_update', states: deviceStates });
+  const stateStr = JSON.stringify({
+    type: 'state_update',
+    states: deviceStates,
+    batteryHistory: batteryHistory,
+  });
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(stateStr);
@@ -29,22 +61,32 @@ function broadcastState() {
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
-  
-  // Send current state immediately upon connection
-  ws.send(JSON.stringify({ type: 'state_update', states: deviceStates }));
+
+  // Send current state + full battery history immediately upon connection
+  ws.send(JSON.stringify({
+    type: 'state_update',
+    states: deviceStates,
+    batteryHistory: batteryHistory,
+  }));
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      
+
       if (data.type === 'device_update') {
         const { deviceId, state } = data;
-        
+
         if (deviceId && state) {
           deviceStates[deviceId] = {
             ...state,
             timestamp: Date.now()
           };
+
+          // Record battery history (1-min dedup handled inside)
+          if (state.battery != null) {
+            recordBatteryHistory(deviceId, state);
+          }
+
           console.log(`Updated state for ${deviceId}:`, state);
           broadcastState();
         }
@@ -62,3 +104,4 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`Backend server listening on port ${PORT}`);
 });
+

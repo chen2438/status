@@ -4,6 +4,7 @@ import BatteryChart from './BatteryChart';
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
+  const [androidBatteryHistory, setAndroidBatteryHistory] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   useEffect(() => {
@@ -23,6 +24,9 @@ function App() {
           const data = JSON.parse(event.data);
           if (data.type === 'state_update') {
             setDeviceStates(data.states);
+            if (data.batteryHistory && data.batteryHistory.android) {
+              setAndroidBatteryHistory(data.batteryHistory.android);
+            }
           }
         } catch (error) {
           console.error('Error parsing message:', error);
@@ -201,6 +205,7 @@ function App() {
                   battery={deviceStates.android.battery}
                   isCharging={deviceStates.android.isCharging}
                   timestamp={deviceStates.android.timestamp}
+                  initialHistory={androidBatteryHistory}
                 />
 
                 <div className={`app-focus-card ${deviceStates.android.isScreenLocked ? 'locked-theme' : 'android-theme'}`}>

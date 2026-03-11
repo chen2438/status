@@ -3,11 +3,24 @@ import { useState, useEffect, useRef } from 'react';
 const MAX_HISTORY = 1440; // 24 hours at 1-minute sampling
 const SAMPLE_INTERVAL_MS = 60 * 1000; // Store one point per minute
 
-function BatteryChart({ battery, isCharging, timestamp }) {
+function BatteryChart({ battery, isCharging, timestamp, initialHistory }) {
     const [history, setHistory] = useState([]);
     const lastTimestampRef = useRef(null);
     const lastStoredTimeRef = useRef(0);
+    const initializedRef = useRef(false);
 
+    // Initialize from server history (runs once when initialHistory arrives)
+    useEffect(() => {
+        if (initializedRef.current) return;
+        if (initialHistory && initialHistory.length > 0) {
+            setHistory(initialHistory);
+            const lastEntry = initialHistory[initialHistory.length - 1];
+            lastStoredTimeRef.current = lastEntry.time || 0;
+            initializedRef.current = true;
+        }
+    }, [initialHistory]);
+
+    // Append new real-time data points
     useEffect(() => {
         if (battery == null || timestamp == null) return;
         // Avoid duplicate entries for the same WebSocket timestamp
@@ -15,7 +28,6 @@ function BatteryChart({ battery, isCharging, timestamp }) {
         lastTimestampRef.current = timestamp;
 
         // Only store a data point if enough time has passed (1 minute)
-        // Always store the very first point
         const now = Date.now();
         if (lastStoredTimeRef.current !== 0 && now - lastStoredTimeRef.current < SAMPLE_INTERVAL_MS) {
             return;
