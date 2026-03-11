@@ -198,7 +198,16 @@ function App() {
 
                 <div className="app-focus-card android-theme">
                   <div className="app-label"><AppWindow size={14} /> Foreground App</div>
-                  <div className="app-name highlight-text">{deviceStates.android.foregroundApp || 'None'}</div>
+                  <div className="app-info">
+                    {deviceStates.android.foregroundAppIcon && (
+                      <img
+                        src={`data:image/png;base64,${deviceStates.android.foregroundAppIcon}`}
+                        alt="App Icon"
+                        className="app-icon"
+                      />
+                    )}
+                    <span className="app-name highlight-text">{deviceStates.android.foregroundApp || 'None'}</span>
+                  </div>
                 </div>
 
                 <div className="last-updated">

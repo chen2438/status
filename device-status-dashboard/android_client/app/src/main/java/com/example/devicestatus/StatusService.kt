@@ -16,6 +16,13 @@ import android.os.Looper
 import android.util.Log
 import okhttp3.*
 import org.json.JSONObject
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 
 class StatusService : Service() {
 
@@ -76,7 +83,9 @@ class StatusService : Service() {
         // NOTE: Uses 10.0.2.2 for Android Emulator to host localhost. 
         // If testing on real device on same network, user needs to change this IP.
 //        val request = Request.Builder().url("ws://10.0.2.2:8080").build()
-        val request = Request.Builder().url("ws://172.19.161.181:8080").build()
+//        val request = Request.Builder().url("ws://172.19.161.181:8080").build()
+        val request = Request.Builder().url("ws://status.vayki.com:8080").build()
+
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d("StatusService", "Connected to WS")
@@ -93,12 +102,17 @@ class StatusService : Service() {
 
         val batteryLevel = getBatteryLevel()
         val isCharging = isBatteryCharging()
-        val foregroundApp = getForegroundApp()
+        val foregroundPackage = getForegroundPackage()
+        val foregroundApp = getAppName(foregroundPackage)
+        val foregroundAppIcon = getAppIconBase64(foregroundPackage)
 
         val state = JSONObject().apply {
             put("battery", batteryLevel)
             put("isCharging", isCharging)
             put("foregroundApp", foregroundApp)
+            if (foregroundAppIcon != null) {
+                put("foregroundAppIcon", foregroundAppIcon)
+            }
         }
 
         val payload = JSONObject().apply {
@@ -125,22 +139,61 @@ class StatusService : Service() {
         }
     }
 
-    private fun getForegroundApp(): String {
+    private fun getForegroundPackage(): String {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val time = System.currentTimeMillis()
         val events = usageStatsManager.queryEvents(time - 1000 * 60, time) // last 1 minute
-        var currentApp = "Unknown"
+        var currentPackage = ""
 
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                currentApp = event.packageName
+                currentPackage = event.packageName
             }
         }
+        return currentPackage
+    }
 
-        // Clean up package name to make it readable (e.g. com.google.android.youtube -> YouTube)
-        return currentApp.split(".").last().replaceFirstChar { it.uppercase() }
+    private fun getAppName(packageName: String): String {
+        if (packageName.isEmpty()) return "Unknown"
+        return try {
+            val pm = packageManager
+            val info = pm.getApplicationInfo(packageName, 0)
+            pm.getApplicationLabel(info).toString()
+        } catch (e: PackageManager.NameNotFoundException) {
+            packageName.split(".").last().replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    private fun getAppIconBase64(packageName: String): String? {
+        if (packageName.isEmpty()) return null
+        return try {
+            val pm = packageManager
+            val iconDrawable = pm.getApplicationIcon(packageName)
+            val bitmap = drawableToBitmap(iconDrawable)
+            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 64, 64, true)
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            val byteArray = outputStream.toByteArray()
+            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Log.e("StatusService", "Error getting app icon", e)
+            null
+        }
+    }
+
+    private fun drawableToBitmap(drawable: Drawable): Bitmap {
+        if (drawable is BitmapDrawable) {
+            return drawable.bitmap
+        }
+        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 64
+        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 64
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     private fun createNotificationChannel() {
