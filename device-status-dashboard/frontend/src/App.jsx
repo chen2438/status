@@ -223,7 +223,7 @@ function App() {
                       <span className="app-name highlight-text">{deviceStates.android.foregroundApp || 'None'}</span>
                       {deviceStates.android.foregroundAppDuration != null && (
                         <span className="app-duration">
-                          {formatDuration(deviceStates.android.foregroundAppDuration)}
+                          Time spent: {formatDuration(deviceStates.android.foregroundAppDuration)}
                         </span>
                       )}
                     </div>
