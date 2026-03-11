@@ -184,7 +184,7 @@ class StatusService : Service() {
         val batteryCurrent = getBatteryCurrent()
         val isScreenLocked = isScreenLocked()
         val foregroundPackage = if (isScreenLocked) "" else getForegroundPackage()
-        val foregroundApp = if (isScreenLocked) "锁屏" else getAppName(foregroundPackage)
+        val foregroundApp = if (isScreenLocked) "Screen Locked" else getAppName(foregroundPackage)
 
         // Only regenerate icon when the foreground package changes
         val foregroundAppIcon: String? = if (isScreenLocked) {
