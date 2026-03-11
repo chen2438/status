@@ -201,6 +201,7 @@ function App() {
                 <BatteryChart
                   battery={deviceStates.android.battery}
                   isCharging={deviceStates.android.isCharging}
+                  batteryCurrent={deviceStates.android.batteryCurrent}
                   timestamp={deviceStates.android.timestamp}
                   initialHistory={androidBatteryHistory}
                 />

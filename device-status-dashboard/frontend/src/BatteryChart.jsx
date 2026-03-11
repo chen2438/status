@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 const MAX_HISTORY = 1440; // 24 hours at 1-minute sampling
 const SAMPLE_INTERVAL_MS = 60 * 1000; // Store one point per minute
 
-function BatteryChart({ battery, isCharging, timestamp, initialHistory }) {
+function BatteryChart({ battery, isCharging, batteryCurrent, timestamp, initialHistory }) {
     const [history, setHistory] = useState([]);
     const lastTimestampRef = useRef(null);
     const lastStoredTimeRef = useRef(0);
@@ -95,11 +95,20 @@ function BatteryChart({ battery, isCharging, timestamp, initialHistory }) {
     // Latest value
     const latest = history[history.length - 1];
 
+    // Format current string
+    let currentString = '';
+    if (batteryCurrent != null) {
+        const sign = batteryCurrent > 0 ? '+' : '';
+        currentString = `( ${sign}${batteryCurrent}mA )`;
+    }
+
     return (
         <div className="battery-chart-container">
             <div className="chart-header">
                 <span className="chart-title">Battery Trend</span>
-                <span className="chart-latest">{latest.battery}%</span>
+                <span className="chart-latest">
+                    {latest.battery}% {currentString && <span className="chart-current">{currentString}</span>}
+                </span>
             </div>
             <svg viewBox={`0 0 ${W} ${H}`} className="battery-chart-svg" preserveAspectRatio="none">
                 <defs>

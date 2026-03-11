@@ -170,6 +170,7 @@ class StatusService : Service() {
 
         val batteryLevel = getBatteryLevel()
         val isCharging = isBatteryCharging()
+        val batteryCurrent = getBatteryCurrent()
         val isScreenLocked = isScreenLocked()
         val foregroundPackage = if (isScreenLocked) "" else getForegroundPackage()
         val foregroundApp = if (isScreenLocked) "锁屏" else getAppName(foregroundPackage)
@@ -186,6 +187,7 @@ class StatusService : Service() {
         val state = JSONObject().apply {
             put("battery", batteryLevel)
             put("isCharging", isCharging)
+            put("batteryCurrent", batteryCurrent)
             put("isScreenLocked", isScreenLocked)
             put("foregroundApp", foregroundApp)
             put("foregroundAppDuration", durationSecs)
@@ -212,6 +214,12 @@ class StatusService : Service() {
     private fun getBatteryLevel(): Int {
         val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
+
+    private fun getBatteryCurrent(): Int {
+        val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val microAmps = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        return microAmps / 1000 // Convert to milliAmperes
     }
 
     private fun isScreenLocked(): Boolean {
