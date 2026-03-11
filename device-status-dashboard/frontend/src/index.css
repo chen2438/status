@@ -658,11 +658,6 @@ h1 {
   font-family: 'Inter', system-ui, sans-serif !important;
 }
 
-.leaflet-control-container {
-  display: none !important;
-  /* Hide zoom controls for cleaner look */
-}
-
 .location-map-overlay {
   position: absolute;
   top: 8px;
