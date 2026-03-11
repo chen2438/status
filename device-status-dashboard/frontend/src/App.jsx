@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock } from 'lucide-react';
+import BatteryChart from './BatteryChart';
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
@@ -195,6 +196,12 @@ function App() {
                     </div>
                   </div>
                 </div>
+
+                <BatteryChart
+                  battery={deviceStates.android.battery}
+                  isCharging={deviceStates.android.isCharging}
+                  timestamp={deviceStates.android.timestamp}
+                />
 
                 <div className={`app-focus-card ${deviceStates.android.isScreenLocked ? 'locked-theme' : 'android-theme'}`}>
                   <div className="app-label"><AppWindow size={14} /> Foreground App</div>
