@@ -1,11 +1,24 @@
 version: '3.8'
 
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: dashboard-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
   backend:
     build: ./backend
     container_name: dashboard-backend
-    ports:
-      - "8080:8080"
     volumes:
       - ./backend/data:/app/data
     restart: always
@@ -14,10 +27,12 @@ services:
     build: 
       context: ./frontend
       args:
-        VITE_WS_URL: "ws://status.vayki.com:8080" 
+        VITE_WS_URL: "wss://status.vayki.com/ws" 
     container_name: dashboard-frontend
-    ports:
-      - "80:80"
     restart: always
     depends_on:
       - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
