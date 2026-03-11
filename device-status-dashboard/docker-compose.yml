@@ -6,6 +6,8 @@ services:
     container_name: dashboard-backend
     ports:
       - "8080:8080"
+    volumes:
+      - ./backend/data:/app/data
     restart: always
 
   frontend:
