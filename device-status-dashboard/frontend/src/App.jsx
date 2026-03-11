@@ -198,19 +198,6 @@ function App() {
               <div className="empty-state">Waiting for device data...</div>
             ) : (
               <div className="metrics-layout">
-                <div className="metric-row full android-battery-row">
-                  <div className="metric">
-                    <div className="metric-label"><Battery size={16} /> Battery Level</div>
-                    <div className="metric-value battery-large">
-                      <div className="battery-shell">
-                        <div className={`battery-fill ${deviceStates.android.battery > 20 ? 'healthy' : 'low'}`} style={{ width: `${deviceStates.android.battery}%` }}></div>
-                        {deviceStates.android.isCharging && <BatteryCharging className="charging-icon" size={18} color="#059669" />}
-                      </div>
-                      <span className="battery-text value-text">{deviceStates.android.battery}%</span>
-                    </div>
-                  </div>
-                </div>
-
                 <BatteryChart
                   battery={deviceStates.android.battery}
                   isCharging={deviceStates.android.isCharging}
