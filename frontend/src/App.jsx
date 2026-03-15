@@ -4,6 +4,19 @@ import BatteryChart from './BatteryChart';
 import LocationMap from './LocationMap';
 import ChangelogModal from './ChangelogModal';
 
+function getApiBaseUrl() {
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl) {
+    return envApiUrl.replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  return '';
+}
+
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
   const [androidBatteryHistory, setAndroidBatteryHistory] = useState([]);
@@ -82,16 +95,23 @@ function App() {
 
   const sendNotify = async (deviceId) => {
     try {
-      const res = await fetch('/api/notify', {
+      const res = await fetch(`${getApiBaseUrl()}/api/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId }),
       });
-      const data = await res.json();
-      if (data.success) {
+
+      const contentType = res.headers.get('content-type') || '';
+      const responseText = await res.text();
+      const data = contentType.includes('application/json')
+        ? JSON.parse(responseText)
+        : null;
+
+      if (res.ok && data?.success) {
         alert('Notification sent via Telegram!');
       } else {
-        alert(`Failed: ${data.error}`);
+        const errorMessage = data?.error || responseText || `Request failed with status ${res.status}`;
+        alert(`Failed: ${errorMessage}`);
       }
     } catch (err) {
       alert(`Error: ${err.message}`);

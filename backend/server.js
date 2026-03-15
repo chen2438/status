@@ -160,8 +160,11 @@ function broadcastState() {
 }
 
 const server = http.createServer((req, res) => {
+  const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = requestUrl.pathname.replace(/\/$/, '');
+
   // Handle POST /api/notify for manual Telegram notification
-  if (req.method === 'POST' && req.url === '/api/notify') {
+  if (req.method === 'POST' && (pathname === '/api/notify' || pathname === '/notify')) {
     let body = '';
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
