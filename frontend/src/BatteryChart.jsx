@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 
 const MAX_HISTORY = 1440; // 24 hours at 1-minute sampling
 const SAMPLE_INTERVAL_MS = 60 * 1000; // Store one point per minute
+const OFFLINE_GAP_MS = SAMPLE_INTERVAL_MS * 2;
 
 function BatteryChart({ battery, isCharging, batteryCurrent, timestamp, initialHistory }) {
     const [history, setHistory] = useState([]);
@@ -16,6 +17,7 @@ function BatteryChart({ battery, isCharging, batteryCurrent, timestamp, initialH
             setHistory(initialHistory);
             const lastEntry = initialHistory[initialHistory.length - 1];
             lastStoredTimeRef.current = lastEntry.time || 0;
+            lastTimestampRef.current = lastEntry.time || null;
             initializedRef.current = true;
         }
     }, [initialHistory]);
@@ -68,25 +70,58 @@ function BatteryChart({ battery, isCharging, batteryCurrent, timestamp, initialH
     const yMin = 0;
     const yMax = 100;
     const toY = (v) => PAD_T + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
-    const toX = (i) => PAD_L + (i / (history.length - 1)) * chartW;
+    const minTime = history[0].time;
+    const maxTime = history[history.length - 1].time;
+    const timeRange = Math.max(maxTime - minTime, SAMPLE_INTERVAL_MS);
+    const toX = (time) => PAD_L + ((time - minTime) / timeRange) * chartW;
 
-    // Build polyline
-    const points = history.map((d, i) => `${toX(i)},${toY(d.battery)}`).join(' ');
-    // Closed area path for gradient fill
-    const areaPath = [
-        `M ${toX(0)},${toY(history[0].battery)}`,
-        ...history.slice(1).map((d, i) => `L ${toX(i + 1)},${toY(d.battery)}`),
-        `L ${toX(history.length - 1)},${PAD_T + chartH}`,
-        `L ${toX(0)},${PAD_T + chartH}`,
-        'Z',
-    ].join(' ');
+    const segments = [];
+    const offlineRanges = [];
+    let currentSegment = [history[0]];
+
+    for (let i = 1; i < history.length; i += 1) {
+        const prev = history[i - 1];
+        const current = history[i];
+        const gap = current.time - prev.time;
+
+        if (gap > OFFLINE_GAP_MS) {
+            segments.push(currentSegment);
+            offlineRanges.push({
+                start: prev.time,
+                end: current.time,
+                durationMs: gap,
+            });
+            currentSegment = [current];
+            continue;
+        }
+
+        currentSegment.push(current);
+    }
+
+    if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+    }
+
+    const segmentLinePoints = segments
+        .filter((segment) => segment.length > 0)
+        .map((segment) => segment.map((point) => `${toX(point.time)},${toY(point.battery)}`).join(' '));
+
+    const segmentAreaPaths = segments
+        .filter((segment) => segment.length > 1)
+        .map((segment) => [
+            `M ${toX(segment[0].time)},${toY(segment[0].battery)}`,
+            ...segment.slice(1).map((point) => `L ${toX(point.time)},${toY(point.battery)}`),
+            `L ${toX(segment[segment.length - 1].time)},${PAD_T + chartH}`,
+            `L ${toX(segment[0].time)},${PAD_T + chartH}`,
+            'Z',
+        ].join(' '));
 
     // Time labels: first, middle, last
     const fmt = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const timeLabels = [
-        { x: toX(0), label: fmt(history[0].time) },
-        { x: toX(Math.floor(history.length / 2)), label: fmt(history[Math.floor(history.length / 2)].time) },
-        { x: toX(history.length - 1), label: fmt(history[history.length - 1].time) },
+        { x: toX(minTime), label: fmt(minTime) },
+        { x: toX(minTime + Math.floor(timeRange / 2)), label: fmt(minTime + Math.floor(timeRange / 2)) },
+        { x: toX(maxTime), label: fmt(maxTime) },
     ];
 
     // Y axis labels
@@ -138,22 +173,68 @@ function BatteryChart({ battery, isCharging, batteryCurrent, timestamp, initialH
                     </text>
                 ))}
 
+                {/* Offline gaps */}
+                {offlineRanges.map((range, index) => {
+                    const startX = toX(range.start);
+                    const endX = toX(range.end);
+                    const midX = (startX + endX) / 2;
+                    const minutes = Math.round(range.durationMs / 60000);
+                    const label = `Offline ${minutes}m`;
+                    const showLabel = endX - startX > 34;
+
+                    return (
+                        <g key={`${range.start}-${range.end}-${index}`}>
+                            <rect
+                                x={startX}
+                                y={PAD_T}
+                                width={Math.max(endX - startX, 2)}
+                                height={chartH}
+                                className="chart-offline-band"
+                            />
+                            <line
+                                x1={startX}
+                                y1={PAD_T}
+                                x2={startX}
+                                y2={PAD_T + chartH}
+                                className="chart-offline-edge"
+                            />
+                            <line
+                                x1={endX}
+                                y1={PAD_T}
+                                x2={endX}
+                                y2={PAD_T + chartH}
+                                className="chart-offline-edge"
+                            />
+                            {showLabel && (
+                                <text x={midX} y={PAD_T + 14} className="chart-offline-label" textAnchor="middle">
+                                    {label}
+                                </text>
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Area fill */}
-                <path d={areaPath} fill="url(#batteryGrad)" />
+                {segmentAreaPaths.map((path, index) => (
+                    <path key={index} d={path} fill="url(#batteryGrad)" />
+                ))}
 
                 {/* Line */}
-                <polyline
-                    points={points}
-                    fill="none"
-                    stroke={latest.battery > 20 ? '#10b981' : '#ef4444'}
-                    strokeWidth="2"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                />
+                {segmentLinePoints.map((points, index) => (
+                    <polyline
+                        key={index}
+                        points={points}
+                        fill="none"
+                        stroke={latest.battery > 20 ? '#10b981' : '#ef4444'}
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                    />
+                ))}
 
                 {/* Current value dot */}
                 <circle
-                    cx={toX(history.length - 1)}
+                    cx={toX(latest.time)}
                     cy={toY(latest.battery)}
                     r="3"
                     fill={latest.battery > 20 ? '#10b981' : '#ef4444'}

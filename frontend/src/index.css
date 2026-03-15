@@ -705,6 +705,24 @@ h1 {
   font-family: 'Outfit', sans-serif;
 }
 
+.chart-offline-band {
+  fill: rgba(239, 68, 68, 0.08);
+}
+
+.chart-offline-edge {
+  stroke: rgba(248, 113, 113, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart-offline-label {
+  fill: rgba(255, 255, 255, 0.72);
+  font-size: 7px;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
 .chart-dot-pulse {
   animation: dotPulse 2s ease-in-out infinite;
 }
