@@ -82,9 +82,7 @@ function App() {
 
   const sendNotify = async (deviceId) => {
     try {
-      const baseUrl = (import.meta.env.VITE_WS_URL || 'ws://localhost:8080')
-        .replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/ws$/, '');
-      const res = await fetch(`${baseUrl}/api/notify`, {
+      const res = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId }),
