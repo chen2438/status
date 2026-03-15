@@ -19,6 +19,9 @@ services:
   backend:
     build: ./backend
     container_name: dashboard-backend
+    environment:
+      - TG_BOT_TOKEN=your_telegram_bot_token_here
+      - TG_CHAT_ID=your_telegram_chat_id_here
     volumes:
       - ./backend/data:/app/data
     restart: always

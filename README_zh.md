@@ -9,6 +9,9 @@
 - **Android 定位追踪**：在交互式迷你地图上查看您 Android 设备的实时 GPS 位置。
 - **实时的充放电电流**：显示手机端目前实时的电池充放电电流。
 - **电量趋势历史记录**：24小时的电量历史折线图，支持服务端重启后的数据持久化。
+- **网络信息**：显示实时网速、连接类型（Wi-Fi/蜂窝数据）和网络名称。
+- **应用排行**：显示过去 24 小时内使用时长最多的 Top 5 应用。
+- **Telegram 离线通知**：设备离线 3 分钟后自动通过 Telegram Bot 发送通知，也支持在网页上手动点击按钮发送通知。
 - **安全的自动化部署**：开箱即用的 Docker 与 Caddy 配置，全自动支持 Let's Encrypt HTTPS 和 WSS（安全的 WebSocket）。
 
 ## 系统架构
@@ -41,14 +44,25 @@
    - 打开根目录的 `Caddyfile`，将 `status.vayki.com` 更改为您的实际域名。
    - 打开 `docker-compose.yml`，找到 `frontend` 服务下的 `build.args.VITE_WS_URL`，将其更改为 `wss://您的域名/ws`。
 
-3. **启动服务**：
+3. **配置 Telegram 通知（可选）**：
+   打开 `docker-compose.yml`，编辑 `backend` 服务的环境变量：
+   ```yaml
+   environment:
+     - TG_BOT_TOKEN=你的Telegram机器人Token
+     - TG_CHAT_ID=你的Telegram聊天ID
+   ```
+   - **获取 Bot Token**：在 Telegram 中与 [@BotFather](https://t.me/BotFather) 对话，创建一个新的 Bot，复制它给你的 Token。
+   - **获取 Chat ID**：给你创建的 Bot 发一条消息，然后访问 `https://api.telegram.org/bot<你的Token>/getUpdates`，在返回的 JSON 中找到 `chat.id` 字段。
+   - 如果不配置，仪表盘仍然可以正常使用，只是不会有 Telegram 通知功能。
+
+4. **启动服务**：
    ```bash
    docker compose up -d --build
    ```
    
    Docker 将拉取镜像并构建 Node.js 后端和 React 前端。Caddy 容器将自动向 Let's Encrypt 申请免费的 SSL 证书，并通过 HTTPS 提供仪表盘服务。
 
-4. **访问仪表盘**：
+5. **访问仪表盘**：
    打开浏览器，访问 `https://您的域名`。
 
 ---

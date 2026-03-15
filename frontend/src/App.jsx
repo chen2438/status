@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal, GitCommit, Clock } from 'lucide-react';
+import { Monitor, Smartphone, Battery, BatteryCharging, Cpu, HardDrive, AppWindow, Wifi, WifiOff, Lock, ArrowUp, ArrowDown, Signal, GitCommit, Clock, Bell } from 'lucide-react';
 import BatteryChart from './BatteryChart';
 import LocationMap from './LocationMap';
 import ChangelogModal from './ChangelogModal';
@@ -80,6 +80,26 @@ function App() {
     return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
   };
 
+  const sendNotify = async (deviceId) => {
+    try {
+      const baseUrl = (import.meta.env.VITE_WS_URL || 'ws://localhost:8080')
+        .replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/ws$/, '');
+      const res = await fetch(`${baseUrl}/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Notification sent via Telegram!');
+      } else {
+        alert(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <div className="background-shapes">
@@ -124,7 +144,11 @@ function App() {
                 </div>
               </div>
             </div>
-
+            {(!deviceStates.macos || isStale(deviceStates.macos?.timestamp)) && (
+              <button className="notify-btn" onClick={() => sendNotify('macos')}>
+                <Bell size={14} /> Notify
+              </button>
+            )}
           </div>
 
           <div className="card-body">
@@ -205,7 +229,11 @@ function App() {
                 </div>
               </div>
             </div>
-
+            {(!deviceStates.android || isStale(deviceStates.android?.timestamp)) && (
+              <button className="notify-btn" onClick={() => sendNotify('android')}>
+                <Bell size={14} /> Notify
+              </button>
+            )}
           </div>
 
           <div className="card-body">

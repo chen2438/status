@@ -8,6 +8,9 @@ Device Status Dashboard is a real-time monitoring web application that tracks th
 - **Foreground App Tracking**: See which application is currently active on your devices (including the app icon and the duration it has been active).
 - **Android Location Tracking**: View the real-time GPS location of your Android device on an interactive mini-map.
 - **Battery Trend History**: A 24-hour historical chart of battery levels, with persistent storage across server restarts.
+- **Network Info**: View real-time network speed, connection type (Wi-Fi/Cellular), and network name.
+- **Top Apps**: See the top 5 most used apps in the past 24 hours.
+- **Telegram Notifications**: Get notified via Telegram Bot when a device goes offline (auto-notify after 3 minutes, or trigger manually from the dashboard).
 - **Secure Deployment**: Out-of-the-box configuration for Docker and Caddy, providing automatic Let's Encrypt HTTPS and WSS (secure WebSocket) support.
 
 ## Architecture
@@ -40,14 +43,25 @@ The project is designed to be easily deployed on a Linux server (like an Ubuntu 
    - Open `Caddyfile` and change `status.vayki.com` to your actual domain name.
    - Open `docker-compose.yml`, locate the `frontend` service `build.args.VITE_WS_URL`, and change it to `wss://your_domain.com/ws`.
 
-3. **Start the Services**:
+3. **Configure Telegram Notifications (Optional)**:
+   Open `docker-compose.yml` and edit the `backend` service environment variables:
+   ```yaml
+   environment:
+     - TG_BOT_TOKEN=your_telegram_bot_token_here
+     - TG_CHAT_ID=your_telegram_chat_id_here
+   ```
+   - **Get a Bot Token**: Talk to [@BotFather](https://t.me/BotFather) on Telegram, create a new bot, and copy the token.
+   - **Get your Chat ID**: Send a message to your bot, then visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` to find your `chat.id`.
+   - If not configured, the dashboard will work normally but without Telegram alert functionality.
+
+4. **Start the Services**:
    ```bash
    docker compose up -d --build
    ```
    
    Docker will build the Node.js backend and the React frontend. The Caddy container will automatically request a free SSL certificate from Let's Encrypt and start serving your dashboard over HTTPS.
 
-4. **Access the Dashboard**:
+5. **Access the Dashboard**:
    Open a browser and navigate to `https://your_domain.com`.
 
 ---

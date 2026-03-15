@@ -17,6 +17,7 @@ import android.os.PowerManager
 import android.util.Log
 import okhttp3.*
 import org.json.JSONObject
+import org.json.JSONArray
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
@@ -51,19 +52,12 @@ class StatusService : Service() {
     private var lastSentIconPackage: String = ""
     private var cachedIconBase64: String? = null
     private var locationManager: LocationManager? = null
-    private var lastLocation: Location? = null
     private var lastTxBytes: Long = TrafficStats.getTotalTxBytes()
     private var lastRxBytes: Long = TrafficStats.getTotalRxBytes()
     private var lastTrafficTimestamp: Long = System.currentTimeMillis()
     private var cachedWifiSsid: String = ""
 
-    private val locationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            lastLocation = location
-        }
-        override fun onProviderEnabled(provider: String) {}
-        override fun onProviderDisabled(provider: String) {}
-    }
+
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -106,24 +100,6 @@ class StatusService : Service() {
         wakeLock?.acquire()
         
         startWebSocket()
-        
-        try {
-            // Request location updates every 5 minutes (300,000 ms) and 0 meters
-            locationManager?.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                300000L,
-                0f,
-                locationListener
-            )
-            locationManager?.requestLocationUpdates(
-                LocationManager.NETWORK_PROVIDER,
-                300000L,
-                0f,
-                locationListener
-            )
-        } catch (e: SecurityException) {
-            Log.e("StatusService", "Location permission denied", e)
-        }
 
         isRunning = true
         handler.post(updateRunnable)
@@ -140,11 +116,6 @@ class StatusService : Service() {
             if (it.isHeld) {
                 it.release()
             }
-        }
-        try {
-            locationManager?.removeUpdates(locationListener)
-        } catch (e: SecurityException) {
-            // ignore
         }
     }
 
@@ -216,7 +187,8 @@ class StatusService : Service() {
             if (foregroundAppIcon != null) {
                 put("foregroundAppIcon", foregroundAppIcon)
             }
-            lastLocation?.let { loc ->
+            val location = getCurrentLocation()
+            location?.let { loc ->
                 put("location", JSONObject().apply {
                     put("lat", loc.latitude)
                     put("lng", loc.longitude)
@@ -261,6 +233,24 @@ class StatusService : Service() {
             status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         } else {
             false // fallback for older versions
+        }
+    }
+
+    private fun getCurrentLocation(): Location? {
+        return try {
+            val gpsLocation = locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val networkLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            // Prefer the more recent one
+            when {
+                gpsLocation != null && networkLocation != null ->
+                    if (gpsLocation.time >= networkLocation.time) gpsLocation else networkLocation
+                gpsLocation != null -> gpsLocation
+                networkLocation != null -> networkLocation
+                else -> null
+            }
+        } catch (e: SecurityException) {
+            Log.e("StatusService", "Location permission denied", e)
+            null
         }
     }
 
@@ -379,24 +369,54 @@ class StatusService : Service() {
 
     private fun getTopUsageApps(): JSONArray {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val time = System.currentTimeMillis()
-        val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            time - 1000 * 60 * 60 * 24L,
-            time
-        )
+        val timeNow = System.currentTimeMillis()
+        val timeStart = timeNow - 1000 * 60 * 60 * 24L
+
+        val events = usageStatsManager.queryEvents(timeStart, timeNow)
+        val event = UsageEvents.Event()
         
         val appUsageMap = mutableMapOf<String, Long>()
-        stats?.forEach { stat ->
-            if (stat.totalTimeInForeground > 60_000) { // More than 1 minute
-                val appName = getAppName(stat.packageName)
-                if (appName != "Unknown") {
-                    appUsageMap[appName] = (appUsageMap[appName] ?: 0L) + stat.totalTimeInForeground
+        val appStartTimes = mutableMapOf<String, Long>()
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName
+            val eventTime = event.timeStamp
+            
+            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                // Pin the start time to the beginning of our 24h window if the event happened before
+                appStartTimes[pkg] = maxOf(eventTime, timeStart)
+            } else if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED || 
+                       event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) {
+                appStartTimes[pkg]?.let { startTime ->
+                    val duration = eventTime - startTime
+                    if (duration > 0) {
+                        appUsageMap[pkg] = (appUsageMap[pkg] ?: 0L) + duration
+                    }
+                    appStartTimes.remove(pkg)
                 }
             }
         }
         
-        val topApps = appUsageMap.entries.sortedByDescending { it.value }.take(5)
+        // Handle apps that are still currently running (RESUMED but no PAUSED event yet)
+        appStartTimes.forEach { (pkg, startTime) ->
+            val duration = timeNow - startTime
+            if (duration > 0) {
+                appUsageMap[pkg] = (appUsageMap[pkg] ?: 0L) + duration
+            }
+        }
+
+        val nameToDurationMap = mutableMapOf<String, Long>()
+        appUsageMap.forEach { (pkg, durationMs) ->
+            if (durationMs > 60_000) { // More than 1 minute
+                val appName = getAppName(pkg)
+                if (appName != "Unknown") {
+                    nameToDurationMap[appName] = (nameToDurationMap[appName] ?: 0L) + durationMs
+                }
+            }
+        }
+        
+        val topApps = nameToDurationMap.entries.sortedByDescending { it.value }.take(5)
         
         val jsonArray = JSONArray()
         topApps.forEach { (name, timeInMillis) ->
