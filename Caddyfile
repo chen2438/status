@@ -1,17 +1,17 @@
 status.vayki.com {
     # Route API traffic to the backend on port 8080
-    route /api/* {
+    handle /api/* {
         reverse_proxy backend:8080
     }
 
     # Route WebSocket traffic to the backend on port 8080
-    route /ws* {
+    handle /ws* {
         uri strip_prefix /ws
         reverse_proxy backend:8080
     }
 
     # Route all other traffic to the frontend on port 80
-    route * {
+    handle {
         reverse_proxy frontend:80
     }
 }
